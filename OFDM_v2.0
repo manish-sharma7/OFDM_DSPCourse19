@@ -1,0 +1,169 @@
+Transmitter
+clc;
+clear all;
+close all;
+no_of_data_bits = 64;   %no of bits per channel, it can be extended to 128
+M = 4; %no of sub carrier channel
+n = M*no_of_data_bits;   %Total no of bits to be transmitted to reciever side
+block_size = 16; %size of each OFDM block to add cyclic prefix = no_of_data_bits/M
+cp_len = floor(block_size/10);%length of the cyclic prefix
+Generate random data source to be transmitted of length 64
+ data = randsrc(1, no_of_data_bits, 0:M-1);
+ figure(1);
+ stem(data);
+ grid on
+ xlabel('Data points');
+ ylabel('Amplitude');
+ title('Original transmitted data');
+ 
+QPSK(Quadrature phase shift keying) Modulation on the input data source
+ qpsk_modulated_data = pskmod(data,M);
+ figure(2);
+ stem(qpsk_modulated_data);
+ grid on
+ xlabel('Data points');
+ ylabel('Amplitude');
+ title('QPSK Modulation data');
+ 
+Conversion into four sub carriers data from single data
+ subcar = reshape( qpsk_modulated_data,no_of_data_bits/M, M );
+ subcar1 = subcar(:,1);
+ subcar2 = subcar(:,2);
+ subcar3 = subcar(:,3);
+ subcar4 = subcar(:,4);
+ figure(3)
+ subplot(4,1,1)
+ stem((subcar1));
+ grid on
+ xlabel('Data points');
+ ylabel('Amplitude');
+ title('Sub carrier 1');
+ subplot(4,1,2)
+ stem(subcar2);
+ grid on
+ xlabel('Data points');
+ ylabel('Amplitude');
+ title('Sub carrier 2');
+ subplot(4,1,3)
+ stem(subcar3);
+ grid on
+ xlabel('Data points');
+ ylabel('Amplitude');
+ title('Sub carrier 3');
+ subplot(4,1,4)
+ stem(subcar4);
+ grid on
+ xlabel('Data value');
+ ylabel('Amplitude');
+ title('Sub carrier 4');
+IFFT of four sub carriers
+cp_start = block_size-cp_len;
+ifft_subcar1=ifft(subcar1);
+ifft_subcar2=ifft(subcar2);
+ifft_subcar3=ifft(subcar3);
+ifft_subcar4=ifft(subcar4); 
+figure(4)
+subplot(4,1,1)
+stem(real(ifft_subcar1));
+grid on
+ title('Sub carrier 1');
+ subplot(4,1,2)
+ stem(real(ifft_subcar2));
+ grid on
+ title('Sub carrier 2');
+ subplot(4,1,3)
+ stem(real(ifft_subcar3));
+ grid on
+ title('Sub carrier 3');
+ subplot(4,1,4)
+ stem(real(ifft_subcar4));
+ grid on
+ title('Sub carrier 4');
+Adding cyclic prefix
+for i=1:M
+    ifft_subcar(:,i) = ifft((subcar(:,i)) , block_size)
+    for j= 1:cp_len
+        cyclic_prefix(j,i) = ifft_subcar(j+cp_start,i);
+    end
+    append_prefix(:,i) = vertcat(cyclic_prefix(:,i), ifft_subcar(:,i));    %appends prefix to each sub carrier
+end
+A1 = append_prefix(:,1);
+A2 = append_prefix(:,2);
+A3 = append_prefix(:,3);
+A4 = append_prefix(:,4);
+figure(5)
+subplot(4,1,1)
+stem(real(A1));
+grid on
+ title('prefix added Sub carrier 1');
+ subplot(4,1,2)
+ stem(real(A2));
+ grid on
+ title('prefix added Sub carrier 2');
+ subplot(4,1,3)
+ stem(real(A3));
+ grid on
+ title('prefix added Sub carrier 3');
+ subplot(4,1,4)
+ stem(real(A4));
+ grid on
+ title('prefix added Sub carrier 4');
+OFDM signal to be transmitted
+len_ofdm_data = no_of_data_bits+M*cp_len;
+ ofdm_signal = reshape(append_prefix, 1, len_ofdm_data);
+figure(6)
+plot(real(ofdm_signal));
+title('OFDM signal');
+Reciever
+Passing through AWGN channel
+channel = randn(1,2)+1i*randn(1,2);
+after_channel = filter(channel, 1, ofdm_signal);
+awgn_noise = awgn(zeros(1, length(after_channel)) , 0);
+recieved_signal = awgn_noise+ after_channel   %recieved signal with awgn noise
+figure(7)
+plot(real(recieved_signal));
+title('OFDM signal after passing through channel');
+grid on
+Removing cyclic prefix
+rows_append_prefix = len_ofdm_data/M;
+cols_append_prefix = M;
+recieved_signal_paralleled = reshape(recieved_signal , rows_append_prefix, cols_append_prefix)
+recieved_signal_paralleled(1:cp_len,:) = [];
+R1 = recieved_signal_paralleled(:,1);
+R2 = recieved_signal_paralleled(:,2);
+R3 = recieved_signal_paralleled(:,3);
+R4 = recieved_signal_paralleled(:,4);
+FFT of recieved signal
+for i=1:M
+    fft_signal(:,i) = fft(recieved_signal_paralleled(:,i),block_size);
+end
+F1 = fft_signal(:,1);
+F2 = fft_signal(:,2);
+F3 = fft_signal(:,3);
+F4 = fft_signal(:,4);
+figure(8)
+subplot(4,1,1)
+stem(real(F1));
+grid on
+ title('FFT of Sub carrier 1');
+ subplot(4,1,2)
+ stem(real(F2));
+ grid on
+ title('FFT of Sub carrier 2');
+ subplot(4,1,3)
+ stem(real(F3));
+ grid on
+ title('FFT of Sub carrier 3');
+ subplot(4,1,4)
+ stem(real(F4));
+ grid on
+ title('FFT of Sub carrier 4');
+Demodulation of recieved signal
+recieved_signal_data = reshape(fft_signal, 1, M*block_size);
+qpsk_demodulated_data = pskdemod(recieved_signal_data,M);
+figure(9)
+stem(qpsk_demodulated_data);
+grid on
+xlabel('Data points');
+ylabel('Amplitude');
+title('Recieved signal');
