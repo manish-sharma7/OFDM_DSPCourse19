@@ -1,3 +1,7 @@
+%taking audio signal to transmit
+wavdata = audioread('signal1.wav');
+wavbinary = dec2bin( typecast( single(wavdata(:)), 'uint32'), 32 ) - '0';
+orig_size = size(wavdata);
 Transmitter
 clc;
 clear all;
